@@ -1,0 +1,63 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClientSecureBearSSL.h>
+#include <Servo.h>
+
+const char* ssid = "AirFiber-jio";
+const char* password = "pr@n@ti-2026";
+
+Servo myServo;
+const int servoPin = D2; 
+
+const char* readURL  = "https://iot.roboninja.in/index.php?action=read&UID=PP10&D1";
+const char* resetURL = "https://iot.roboninja.in/index.php?action=write&UID=PP10&D1=0";
+
+void setup() {
+  Serial.begin(115200);
+  myServo.attach(servoPin);
+  myServo.write(0);
+
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nConnected to WiFi!");
+}
+
+void loop() {
+  if (WiFi.status() == WL_CONNECTED) {
+    BearSSL::WiFiClientSecure client;
+    client.setInsecure();
+
+    HTTPClient http;
+    http.begin(client, readURL);
+    int httpCode = http.GET();
+
+    if (httpCode == 200) {
+      String payload = http.getString();
+      Serial.println("Payload: " + payload); 
+
+      
+      if (payload.indexOf("1") >= 0) {
+        Serial.println("Feeding started!");
+        myServo.write(180);
+        delay(5000);
+        myServo.write(0);
+        Serial.println("Feeding completed.");
+
+        
+        HTTPClient reset;
+        reset.begin(client, resetURL);
+        reset.GET();
+        reset.end();
+        Serial.println("D1 reset to 0");
+      }
+    } else {
+      Serial.println("HTTP GET failed: " + String(httpCode));
+    }
+    http.end();
+  }
+  delay(2000);
+}
